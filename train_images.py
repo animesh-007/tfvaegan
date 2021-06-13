@@ -6,7 +6,7 @@ import torch
 import torch.autograd as autograd
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
+# from torch.autograd import Variable
 #import functions
 import networks.TFVAEGAN_model as model
 import datasets.image_util as util
@@ -91,8 +91,10 @@ def generate_syn_feature(generator,classes, attribute,num,netF=None,netDec=None)
         iclass_att = attribute[iclass]
         syn_att.copy_(iclass_att.repeat(num, 1))
         syn_noise.normal_(0, 1)
-        syn_noisev = Variable(syn_noise,volatile=True)
-        syn_attv = Variable(syn_att,volatile=True)
+        # syn_noisev = Variable(syn_noise,volatile=True)
+        syn_noisev = syn_noise
+        # syn_attv = Variable(syn_att,volatile=True)
+        syn_attv = syn_att
         fake = generator(syn_noisev,c=syn_attv)
         if netF is not None:
             # dec_out = netDec(fake) # only to call the forward function of decoder
@@ -121,8 +123,10 @@ def calc_gradient_penalty(netD,real_data, fake_data, input_att):
     interpolates = alpha * real_data + ((1 - alpha) * fake_data)
     if opt.cuda:
         interpolates = interpolates.cuda()
-    interpolates = Variable(interpolates, requires_grad=True)
-    disc_interpolates = netD(interpolates, Variable(input_att))
+    # interpolates = Variable(interpolates, requires_grad=True)
+    interpolates = interpolates
+    # disc_interpolates = netD(interpolates, Variable(input_att))
+    disc_interpolates = netD(interpolates, input_att)
     ones = torch.ones(disc_interpolates.size())
     if opt.cuda:
         ones = ones.cuda()
@@ -148,8 +152,10 @@ for epoch in range(0,opt.nepoch):
             for iter_d in range(opt.critic_iter):
                 sample()
                 netD.zero_grad()          
-                input_resv = Variable(input_res)
-                input_attv = Variable(input_att)
+                # input_resv = Variable(input_res)
+                # input_attv = Variable(input_att)
+                input_resv = input_res
+                input_attv = input_att
 
                 netDec.zero_grad()
                 recons = netDec(input_resv)
@@ -163,11 +169,13 @@ for epoch in range(0,opt.nepoch):
                     means, log_var = netE(input_resv, input_attv)
                     std = torch.exp(0.5 * log_var)
                     eps = torch.randn([opt.batch_size, opt.latent_size]).cpu()
-                    eps = Variable(eps.cuda())
+                    # eps = Variable(eps.cuda())
+                    eps = eps.cuda()
                     z = eps * std + means #torch.Size([64, 312])
                 else:
                     noise.normal_(0, 1)
-                    z = Variable(noise)
+                    # z = Variable(noise)
+                    z = noise
 
                 if loop == 1:
                     fake = netG(z, c=input_attv)
@@ -207,12 +215,15 @@ for epoch in range(0,opt.nepoch):
             netE.zero_grad()
             netG.zero_grad()
             netF.zero_grad()
-            input_resv = Variable(input_res)
-            input_attv = Variable(input_att)
+            # input_resv = Variable(input_res)
+            # input_attv = Variable(input_att)
+            input_resv = input_res
+            input_attv = input_att
             means, log_var = netE(input_resv, input_attv)
             std = torch.exp(0.5 * log_var)
             eps = torch.randn([opt.batch_size, opt.latent_size]).cpu()
-            eps = Variable(eps.cuda())
+            # eps = Variable(eps.cuda())
+            eps = eps.cuda()
             z = eps * std + means #torch.Size([64, 312])
             if loop == 1:
                 recon_x = netG(z, c=input_attv)
@@ -231,7 +242,8 @@ for epoch in range(0,opt.nepoch):
                 fake = recon_x 
             else:
                 noise.normal_(0, 1)
-                noisev = Variable(noise)
+                # noisev = Variable(noise)
+                noisev = noise
                 if loop == 1:
                     fake = netG(noisev, c=input_attv)
                     dec_out = netDec(recon_x) #Feedback from Decoder encoded output
@@ -258,11 +270,16 @@ for epoch in range(0,opt.nepoch):
             if opt.recons_weight > 0 and not opt.freeze_dec: # not train decoder at feedback time
                 optimizerDec.step() 
         
-    print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.data[0], G_cost.data[0], Wasserstein_D.data[0],vae_loss_seen.data[0]),end=" ")
+    # print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.data[0], G_cost.data[0], Wasserstein_D.data[0],vae_loss_seen.data[0]),end=" ")
+    print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.item(), G_cost.item(), Wasserstein_D.item(),vae_loss_seen.item()),end=" ")
+
     netG.eval()
     netDec.eval()
     netF.eval()
-    syn_feature, syn_label = generate_syn_feature(netG,data.unseenclasses, data.attribute, opt.syn_num,netF=netF,netDec=netDec)
+
+    with torch.no_grad():
+        syn_feature, syn_label = generate_syn_feature(netG,data.unseenclasses, data.attribute, opt.syn_num,netF=netF,netDec=netDec)
+        
     # Generalized zero-shot learning
     if opt.gzsl:   
         # Concatenate real seen features with synthesized unseen features
