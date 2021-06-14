@@ -62,7 +62,7 @@ class CLASSIFIER:
         best_acc = 0
         mean_loss = 0
         last_loss_epoch = 1e8
-        # self.model.train() 
+        self.model.train() 
         best_model = copy.deepcopy(self.model.state_dict())
         for epoch in range(self.nepoch):
             for i in range(0, self.ntrain, self.batch_size):      
@@ -82,10 +82,11 @@ class CLASSIFIER:
                 loss.backward()
                 self.optimizer.step()
                 #print('Training classifier loss= ', loss.data[0])
-            # self.model.eval()
+            self.model.eval()
             with torch.no_grad():
                 acc = self.val(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses)
             #print('acc %.4f' % (acc))
+            self.model.train()
             if acc > best_acc:
                 best_acc = acc
                 best_model = copy.deepcopy(self.model.state_dict())
@@ -96,6 +97,7 @@ class CLASSIFIER:
         best_seen = 0
         best_unseen = 0
         out = []
+        self.model.train()
         best_model = copy.deepcopy(self.model.state_dict())
         # early_stopping = EarlyStopping(patience=20, verbose=True)
         for epoch in range(self.nepoch):
@@ -115,10 +117,12 @@ class CLASSIFIER:
                 self.optimizer.step()
             acc_seen = 0
             acc_unseen = 0
+            self.model.eval()
             with torch.no_grad():
                 acc_seen = self.val_gzsl(self.test_seen_feature, self.test_seen_label, self.seenclasses)
                 acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses)
                 H = 2*acc_seen*acc_unseen / (acc_seen+acc_unseen)
+            self.model.eval()
             if H > best_H:
                 best_seen = acc_seen
                 best_unseen = acc_unseen
