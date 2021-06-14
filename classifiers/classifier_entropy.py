@@ -32,10 +32,11 @@ class CLASSIFIER:
             self.input_dim = self.input_dim + dec_size #4096
             self.input_dim += dec_hidden_size
             self.model = ODDetector(self.input_dim, self.hidden_size, self.nclass)
-            self.train_X = self.compute_dec_out(self.train_X,self.input_dim)
-            self.syn_feat = self.compute_dec_out(self.syn_feat,self.input_dim)
-            self.test_unseen_feature = self.compute_dec_out(self.test_unseen_feature,self.input_dim)
-            self.test_seen_feature = self.compute_dec_out(self.test_seen_feature,self.input_dim)
+            with torch.no_grad():
+                self.train_X = self.compute_dec_out(self.train_X,self.input_dim)
+                self.syn_feat = self.compute_dec_out(self.syn_feat,self.input_dim)
+                self.test_unseen_feature = self.compute_dec_out(self.test_unseen_feature,self.input_dim)
+                self.test_seen_feature = self.compute_dec_out(self.test_seen_feature,self.input_dim)
 
         self.seen_cls_model = seen_classifier.best_model
         self.unseen_cls_model = unseen_classifier.best_model
@@ -68,6 +69,7 @@ class CLASSIFIER:
         best_seen = 0
         best_unseen = 0
         best_H = 0
+        self.model.train()
         for epoch in range(self.nepoch):
             entr_seen = 0
             entr_unseen = 0
@@ -82,8 +84,10 @@ class CLASSIFIER:
                 self.label[:hbsz].copy_(batch_label)                
                 self.input[hbsz:].copy_(batch_input2)
                 self.label[hbsz:].copy_(batch_label2)
-                inputv = Variable(self.input)
-                labelv = Variable(self.label)
+                # inputv = Variable(self.input)
+                # labelv = Variable(self.label)
+                inputv = self.input
+                labelv = self.label
                 model_input = inputv
                 pred = self.model(model_input)
                 ## For seen classes, minimize entropy
@@ -97,10 +101,13 @@ class CLASSIFIER:
                 self.od_optimizer.step()
 
             # GZSL Evaluation using OD
+            self.model.eval()
             ent_thresh = entr_seen.data[0]/self.ntrain
-            acc_seen = self.val_gzsl(self.test_seen_feature, self.test_seen_label, self.seenclasses, ent_thresh, seen_classes=True)
-            acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses, ent_thresh, seen_classes=False) 
-            H = 2*acc_seen*acc_unseen / (acc_seen+acc_unseen+1e-12)
+            with torch.no_grad():
+                acc_seen = self.val_gzsl(self.test_seen_feature, self.test_seen_label, self.seenclasses, ent_thresh, seen_classes=True)
+                acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses, ent_thresh, seen_classes=False) 
+                H = 2*acc_seen*acc_unseen / (acc_seen+acc_unseen+1e-12)
+            self.model.train()
             if H > best_H:
                 best_seen = acc_seen
                 best_unseen = acc_unseen
@@ -147,9 +154,11 @@ class CLASSIFIER:
         for i in range(0, ntest, self.batch_size):
             end = min(ntest, start+self.batch_size)
             if self.cuda:
-                test_Xv = Variable(test_X[start:end].cuda(), volatile=True)
+                # test_Xv = Variable(test_X[start:end].cuda(), volatile=True)
+                test_Xv = test_X[start:end].cuda()
             else:
-                test_Xv = Variable(test_X[start:end], volatile=True)
+                # test_Xv = Variable(test_X[start:end], volatile=True)
+                test_Xv = test_X[start:end]
             output = self.model(test_Xv) 
             entropy_batch = self.criterion(output, batch=True)
             # The following evaluation holds true as seen and unseen sets are validated separately.
@@ -187,9 +196,11 @@ class CLASSIFIER:
         for i in range(0, ntest, self.batch_size):
             end = min(ntest, start+self.batch_size)
             if self.cuda:
-                inputX = Variable(test_X[start:end].cuda(), volatile=True)
+                # inputX = Variable(test_X[start:end].cuda(), volatile=True)
+                inputX = test_X[start:end].cuda()
             else:
-                inputX = Variable(test_X[start:end], volatile=True)
+                # inputX = Variable(test_X[start:end], volatile=True)
+                inputX = test_X[start:end]
             feat1 = self.netDec(inputX)
             feat2 = self.netDec.getLayersOutDet()
             new_test_X[start:end] = torch.cat([inputX,feat1,feat2],dim=1).data.cpu()
