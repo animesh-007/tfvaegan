@@ -45,7 +45,8 @@ print(netDec)
 input_res = torch.FloatTensor(opt.batch_size, opt.resSize)
 input_att = torch.FloatTensor(opt.batch_size, opt.attSize) #attSize class-embedding size
 noise = torch.FloatTensor(opt.batch_size, opt.nz)
-one = torch.FloatTensor([1])
+# one = torch.FloatTensor([1])
+one = torch.tensor(1, dtype=torch.float32)
 mone = one * -1
 ##########
 # Cuda
@@ -97,8 +98,8 @@ def generate_syn_feature(generator,classes, attribute,num,netF=None,netDec=None)
         syn_attv = syn_att
         fake = generator(syn_noisev,c=syn_attv)
         if netF is not None:
-            # dec_out = netDec(fake) # only to call the forward function of decoder
-            dec_hidden_feat = netDec(fake).getLayersOutDet() #no detach layers
+            dec_out = netDec(fake) # only to call the forward function of decoder
+            dec_hidden_feat = netDec.getLayersOutDet() #no detach layers
             feedback_out = netF(dec_hidden_feat)
             fake = generator(syn_noisev, a1=opt.a2, c=syn_attv, feedback_layers=feedback_out)
         output = fake
@@ -124,7 +125,7 @@ def calc_gradient_penalty(netD,real_data, fake_data, input_att):
     if opt.cuda:
         interpolates = interpolates.cuda()
     # interpolates = Variable(interpolates, requires_grad=True)
-    interpolates = interpolates
+    interpolates = interpolates.requires_grad_(True)
     # disc_interpolates = netD(interpolates, Variable(input_att))
     disc_interpolates = netD(interpolates, input_att)
     ones = torch.ones(disc_interpolates.size())
@@ -279,7 +280,7 @@ for epoch in range(0,opt.nepoch):
 
     with torch.no_grad():
         syn_feature, syn_label = generate_syn_feature(netG,data.unseenclasses, data.attribute, opt.syn_num,netF=netF,netDec=netDec)
-        
+
     # Generalized zero-shot learning
     if opt.gzsl:   
         # Concatenate real seen features with synthesized unseen features
