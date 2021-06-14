@@ -122,7 +122,7 @@ class CLASSIFIER:
                 acc_seen = self.val_gzsl(self.test_seen_feature, self.test_seen_label, self.seenclasses)
                 acc_unseen = self.val_gzsl(self.test_unseen_feature, self.test_unseen_label, self.unseenclasses)
                 H = 2*acc_seen*acc_unseen / (acc_seen+acc_unseen)
-            self.model.eval()
+            self.model.train()
             if H > best_H:
                 best_seen = acc_seen
                 best_unseen = acc_unseen
