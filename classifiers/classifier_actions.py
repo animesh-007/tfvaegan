@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim as optim
-import util
+# import util
+import datasets.action_util as util
 import copy
 
 class CLASSIFIER:
