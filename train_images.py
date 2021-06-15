@@ -12,20 +12,29 @@ import networks.TFVAEGAN_model as model
 import datasets.image_util as util
 import classifiers.classifier_images as classifier
 from config_images import opt
+from utils.logger import init_loggers
+import os
+
+# making directory for logger
+os.makedirs("./logs",exist_ok=True)
+logger= init_loggers(opt)
 
 if opt.manualSeed is None:
     opt.manualSeed = random.randint(1, 10000)
-print("Random Seed: ", opt.manualSeed)
+# print("Random Seed: ", opt.manualSeed)
+logger.info(f"Random Seed: {opt.manualSeed}")
 random.seed(opt.manualSeed)
 torch.manual_seed(opt.manualSeed)
 if opt.cuda:
     torch.cuda.manual_seed_all(opt.manualSeed)
 cudnn.benchmark = True
 if torch.cuda.is_available() and not opt.cuda:
-    print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+    # print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+    logger.info("WARNING: You have a CUDA device, so you should probably run with --cuda")
 # load data
 data = util.DATA_LOADER(opt)
-print("# of training samples: ", data.ntrain)
+# print("# of training samples: ", data.ntrain)
+logger.info(f"# of training samples: {data.ntrain}")
 
 netE = model.Encoder(opt)
 netG = model.Generator(opt)
@@ -272,7 +281,7 @@ for epoch in range(0,opt.nepoch):
                 optimizerDec.step() 
         
     # print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.data[0], G_cost.data[0], Wasserstein_D.data[0],vae_loss_seen.data[0]),end=" ")
-    print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.item(), G_cost.item(), Wasserstein_D.item(),vae_loss_seen.item()),end=" ")
+    logger.info('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.item(), G_cost.item(), Wasserstein_D.item(),vae_loss_seen.item()))
 
     netG.eval()
     netDec.eval()
@@ -292,7 +301,8 @@ for epoch in range(0,opt.nepoch):
                 25, opt.syn_num, generalized=True, netDec=netDec, dec_size=opt.attSize, dec_hidden_size=4096)
         if best_gzsl_acc < gzsl_cls.H:
             best_acc_seen, best_acc_unseen, best_gzsl_acc = gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H
-        print('GZSL: seen=%.4f, unseen=%.4f, h=%.4f' % (gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H),end=" ")
+        # print('GZSL: seen=%.4f, unseen=%.4f, h=%.4f' % (gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H),end=" ")
+        logger.info('GZSL: seen=%.4f, unseen=%.4f, h=%.4f' % (gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H))
 
     # Zero-shot learning
     # Train ZSL classifier
@@ -302,16 +312,27 @@ for epoch in range(0,opt.nepoch):
     acc = zsl_cls.acc
     if best_zsl_acc < acc:
         best_zsl_acc = acc
-    print('ZSL: unseen accuracy=%.4f' % (acc))
+    # print('ZSL: unseen accuracy=%.4f' % (acc))
+    logger.info('ZSL: unseen accuracy=%.4f' % (acc))
     # reset G to training mode
     netG.train()
     netDec.train()
     netF.train()
 
-print('Dataset', opt.dataset)
-print('the best ZSL unseen accuracy is', best_zsl_acc)
+# print('Dataset', opt.dataset)
+# print('the best ZSL unseen accuracy is', best_zsl_acc)
+# if opt.gzsl:
+#     print('Dataset', opt.dataset)
+#     print('the best GZSL seen accuracy is', best_acc_seen)
+#     print('the best GZSL unseen accuracy is', best_acc_unseen)
+#     print('the best GZSL H is', best_gzsl_acc)
+
+logger.info('End of training.')
+
+logger.info(f'Dataset {opt.dataset}')
+logger.info(f'the best ZSL unseen accuracy is {best_zsl_acc}')
 if opt.gzsl:
-    print('Dataset', opt.dataset)
-    print('the best GZSL seen accuracy is', best_acc_seen)
-    print('the best GZSL unseen accuracy is', best_acc_unseen)
-    print('the best GZSL H is', best_gzsl_acc)
+    logger.info(f'Dataset {opt.dataset}')
+    logger.info(f'the best GZSL seen accuracy is {best_acc_seen}')
+    logger.info(f'the best GZSL unseen accuracy is {best_acc_unseen}')
+    logger.info(f'the best GZSL H is {best_gzsl_acc}')
