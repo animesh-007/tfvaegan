@@ -4,6 +4,8 @@ import scipy.io as sio
 import torch
 from sklearn import preprocessing
 
+
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Linear') != -1:
@@ -21,17 +23,19 @@ def map_label(label, classes):
 
     return mapped_label
 
+
 class DATA_LOADER(object):
     def __init__(self, opt):
         self.read_matdataset(opt)
         self.index_in_epoch = 0
         self.epochs_completed = 0
+        
 
     def read_matdataset(self, opt):
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/" + opt.image_embedding + ".mat")
+        matcontent = sio.loadmat(opt["datasets"]["dataroot"] + "/" + opt["datasets"]["name"] + "/" + opt["network"]["gan"]["image_embedding"] + ".mat")
         feature = matcontent['features'].T
         label = matcontent['labels'].astype(int).squeeze() - 1
-        matcontent = sio.loadmat(opt.dataroot + "/" + opt.dataset + "/" + opt.class_embedding + "_splits.mat")
+        matcontent = sio.loadmat(opt["datasets"]["dataroot"] + "/" + opt["datasets"]["name"] + "/" + opt["network"]["gan"]["class_embedding"] + "_splits.mat")
         trainval_loc = matcontent['trainval_loc'].squeeze() - 1
         train_loc = matcontent['train_loc'].squeeze() - 1
         val_unseen_loc = matcontent['val_loc'].squeeze() - 1
@@ -41,9 +45,15 @@ class DATA_LOADER(object):
         self.attribute = torch.from_numpy(matcontent['att'].T).float()
         self.attribute /= self.attribute.pow(2).sum(1).sqrt().unsqueeze(1).expand(self.attribute.size(0),self.attribute.size(1))
 
-        if not opt.validation:
-            if opt.preprocessing:
-                if opt.standardization:
+        self.validation = False
+        self.preprocessing = True
+        self.standardization = False
+
+
+
+        if not self.validation:
+            if self.preprocessing:
+                if self.standardization:
                     print('standardization...')
                     scaler = preprocessing.StandardScaler()
                 else:

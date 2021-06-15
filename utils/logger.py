@@ -6,7 +6,7 @@ def get_time_str():
     return time.strftime('%Y%m%d_%H%M%S', time.localtime())
 
 def init_loggers(opt):
-    log_file = os.path.join("./logs", f"train_{opt.dataset}_{get_time_str()}.log")
+    log_file = os.path.join(opt['log'], f"train_{opt['name']}_{get_time_str()}.log")
     logger = get_root_logger(logger_name='ZSl', log_level=logging.INFO, log_file=log_file)
 
     return logger
