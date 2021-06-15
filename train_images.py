@@ -54,7 +54,6 @@ feedback_loop = opt["network"]["feedback"]["feedback_loop"]
 a2 = opt["network"]["feedback"]["a2"]
 freeze_dec =  False
 cuda = False
-encoded_noise = False
 
 logger.info(f"Random Seed: {manual_seed}")
 random.seed(manual_seed)
@@ -209,7 +208,7 @@ for epoch in range(0,num_epoch):
                 criticD_real = netD(input_resv, input_attv)
                 criticD_real = gamma_d*criticD_real.mean()
                 criticD_real.backward(mone)
-                if  encoded_noise:
+                if  noise_gan:
                     means, log_var = netE(input_resv, input_attv)
                     std = torch.exp(0.5 * log_var)
                     eps = torch.randn([batch_size, latent_dim]).cpu()
@@ -283,7 +282,7 @@ for epoch in range(0,num_epoch):
             vae_loss_seen = loss_fn(recon_x, input_resv, means, log_var) # minimize E 3 with this setting feedback will update the loss as well
             errG = vae_loss_seen
             
-            if encoded_noise:  # why this
+            if noise_gan:
                 criticG_fake = netD(recon_x,input_attv).mean()
                 fake = recon_x 
             else:
