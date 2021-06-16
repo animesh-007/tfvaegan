@@ -12,7 +12,7 @@ import networks.TFVAEGAN_model as model
 import datasets.image_util as util
 import classifiers.classifier_images as classifier
 # from config_images import opt
-from utils.logger import init_loggers
+from utils.logger import init_loggers, get_time_str
 from utils.options import parse
 import argparse
 import os
@@ -32,6 +32,15 @@ os.makedirs(opt['log'],exist_ok=True)
 
 # initialize loggers and variables
 logger= init_loggers(opt)
+
+if opt["wandb"]:
+        # wandb initalization
+        import wandb
+        wandb_flag = opt["wandb"]
+        logger.info("wandb initalization of project")
+        run = wandb.init(project="ZSL_Generative", name= f"train_{opt['name']}_{get_time_str()}",reinit=True)
+        wandb.config.update(opt)
+
 dataset_name = opt["datasets"]["name"]
 manual_seed = opt['manual_seed']
 att_size = opt["network"]["gan"]["att_size"]
@@ -54,6 +63,7 @@ feedback_loop = opt["network"]["feedback"]["feedback_loop"]
 a2 = opt["network"]["feedback"]["a2"]
 freeze_dec =  False
 cuda = False
+
 
 logger.info(f"Random Seed: {manual_seed}")
 random.seed(manual_seed)
@@ -100,6 +110,13 @@ if  cuda:
     noise, input_att = noise.cuda(), input_att.cuda()
     one = one.cuda()
     mone = mone.cuda()
+
+if wandb_flag:
+        wandb.watch(netE)
+        wandb.watch(netG)
+        wandb.watch(netD)
+        wandb.watch(netF)
+        wandb.watch(netDec)
 
 def loss_fn(recon_x, x, mean, log_var):
     BCE = torch.nn.functional.binary_cross_entropy(recon_x+1e-12, x.detach(),size_average=False)
@@ -318,6 +335,9 @@ for epoch in range(0,num_epoch):
     # print('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, opt.nepoch, D_cost.data[0], G_cost.data[0], Wasserstein_D.data[0],vae_loss_seen.data[0]),end=" ")
     logger.info('[%d/%d]  Loss_D: %.4f Loss_G: %.4f, Wasserstein_dist:%.4f, vae_loss_seen:%.4f'% (epoch, num_epoch, D_cost.item(), G_cost.item(), Wasserstein_D.item(),vae_loss_seen.item()))
 
+    if wandb_flag:
+        wandb.log({"Discriminator Loss": D_cost.item(), "Generative Loss": G_cost.item()}, step = epoch)
+
     netG.eval()
     netDec.eval()
     netF.eval()
@@ -339,6 +359,9 @@ for epoch in range(0,num_epoch):
         # print('GZSL: seen=%.4f, unseen=%.4f, h=%.4f' % (gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H),end=" ")
         logger.info('GZSL: seen=%.4f, unseen=%.4f, h=%.4f' % (gzsl_cls.acc_seen, gzsl_cls.acc_unseen, gzsl_cls.H))
 
+        if wandb_flag:
+            wandb.log({"GZSL seen accuracy": gzsl_cls.acc_seen, "GZSL unseen accuracy": gzsl_cls.acc_unseen, "Harmonic Mean": gzsl_cls.H}, step = epoch)
+
     # Zero-shot learning
     # Train ZSL classifier
     zsl_cls = classifier.CLASSIFIER(syn_feature, util.map_label(syn_label, data.unseenclasses), \
@@ -349,6 +372,10 @@ for epoch in range(0,num_epoch):
         best_zsl_acc = acc
     # print('ZSL: unseen accuracy=%.4f' % (acc))
     logger.info('ZSL: unseen accuracy=%.4f' % (acc))
+
+    if wandb_flag:
+            wandb.log({"ZSL unseen accuracy": acc}, step = epoch)
+
     # reset G to training mode
     netG.train()
     netDec.train()
@@ -371,3 +398,6 @@ if  gzsl:
     logger.info(f'the best GZSL seen accuracy is {best_acc_seen}')
     logger.info(f'the best GZSL unseen accuracy is {best_acc_unseen}')
     logger.info(f'the best GZSL H is {best_gzsl_acc}')
+
+if wandb_flag:
+    run.finish()
